@@ -48,7 +48,7 @@ function igx(id){return idb().then(function(d){return new Promise(function(r){if
 function idx(id){delete MEM[id];delete BC[id];return idb().then(function(d){if(d)try{d.transaction("a","readwrite").objectStore("a").delete(id)}catch(e){}})}
 /* 소리 변환 */
 function rs(f,r0,r1){if(r0==r1)return f;var n=Math.floor(f.length*r1/r0),o=new Float32Array(n),k=r0/r1;for(var i=0;i<n;i++){var s=Math.floor(i*k),e=Math.min(f.length,Math.floor((i+1)*k)),sum=0;if(e<=s)e=s+1;for(var j=s;j<e;j++)sum+=f[j]||0;o[i]=sum/(e-s)}return o}
-function toPcm(f,r){var x=rs(f,r,PR),o=new Int16Array(x.length);for(var i=0;i<x.length;i++){var v=Math.max(-1,Math.min(1,x[i]));o[i]=v<0?v*32768:v*32767}return{r:PR,d:o}}
+function toPcm(f,r){var x=f,o=new Int16Array(x.length);for(var i=0;i<x.length;i++){var v=Math.max(-1,Math.min(1,x[i]));o[i]=v<0?v*32768:v*32767}return{r:r,d:o}}
 function toBuf(p){var c=ac(),b=c.createBuffer(1,p.d.length,p.r),ch=b.getChannelData(0);for(var i=0;i<p.d.length;i++)ch[i]=p.d[i]/32768;return b}
 async function getBuf(k){if(k=="cur")return CUR&&CUR.buf;if(BC[k])return BC[k];var v=await igx(k);if(!v||!v.d)return null;return BC[k]=toBuf({r:v.r,d:new Int16Array(v.d)})}
 /* 재생 (재생/일시정지) */
@@ -71,7 +71,7 @@ function show(on,msg){$("mic").className=on?"on":"";$("mic").textContent=on?"■
 function start(){halt();CUR=null;$("pl").hidden=true;$("sv").hidden=true;$("er").textContent="";var c=ac();c.resume();show(false,"마이크 준비 중…");
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){$("er").textContent="이 브라우저에서는 마이크를 쓸 수 없어요 (https 주소로 열어야 해요)";show(false,"눌러서 녹음 시작");return}
   var r=R={ch:[],t0:0};
-  navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}}).then(function(st){
+  navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:1}}).then(function(st){
     if(R!==r){st.getTracks().forEach(function(t){t.stop()});return}
     r.st=st;r.src=c.createMediaStreamSource(st);r.pr=c.createScriptProcessor(4096,1,1);r.mu=c.createGain();r.mu.gain.value=0;
     r.pr.onaudioprocess=function(e){r.ch.push(new Float32Array(e.inputBuffer.getChannelData(0)))};
@@ -82,6 +82,7 @@ function stop(){var r=R;R=null;clearInterval(iv);if(!r||!r.st){show(false,"눌�
   try{r.src.disconnect();r.pr.disconnect();r.mu.disconnect()}catch(e){}r.pr.onaudioprocess=null;r.st.getTracks().forEach(function(t){t.stop()});
   var n=0;r.ch.forEach(function(a){n+=a.length});var c=ac();if(n<c.sampleRate*.3){show(false,"너무 짧아요. 다시 눌러 녹음하세요");return}
   var f=new Float32Array(n),o=0;r.ch.forEach(function(a){f.set(a,o);o+=a.length});
+  var pk=0,i;for(i=0;i<f.length;i++){var a=f[i]<0?-f[i]:f[i];if(a>pk)pk=a}if(pk>.01&&pk<.8){var g=Math.min(8,.9/pk);for(i=0;i<f.length;i++)f[i]*=g}
   var p=toPcm(f,c.sampleRate);CUR={pcm:p,buf:toBuf(p),dur:p.d.length/p.r};
   show(false,"방금 녹음 · "+ft(CUR.dur)+" — ▶로 다시 듣고, 마음에 들면 기록하세요");$("pl").hidden=false;$("sv").hidden=false;play("cur")}
 async function save(){if(!CUR)return;var id=Date.now().toString(36)+Math.random().toString(36).slice(2,5),c=CUR,ok=await ipx(id,{r:c.pcm.r,d:c.pcm.d.buffer.slice(0)});
