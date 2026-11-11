@@ -1,40 +1,100 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>쉐도잉 녹음기</title>
 <style>
-:root{--bg:#f6f5f1;--tx:#222;--mu:#808080;--ac:#3b6fd4;--no:#d9473f}
-@media(prefers-color-scheme:dark){:root{--bg:#17181b;--tx:#eee;--mu:#9a9a9a;--ac:#6b96ee;--no:#ef6b63}}
+:root{--bg:#f6f5f1;--card:#fff;--tx:#222;--mu:#808080;--bd:#e2e0da;--ac:#3b6fd4;--no:#d9473f}
+@media(prefers-color-scheme:dark){:root{--bg:#17181b;--card:#222428;--tx:#eee;--mu:#9a9a9a;--bd:#3a3d42;--ac:#6b96ee;--no:#ef6b63}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;margin:0}
-body{background:var(--bg);color:var(--tx);font-family:-apple-system,"Noto Sans KR",sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px}
-#b{width:180px;height:180px;border-radius:50%;border:0;background:var(--ac);color:#fff;font-size:72px;cursor:pointer;box-shadow:0 8px 28px rgba(59,111,212,.4);display:flex;align-items:center;justify-content:center}
-#b.on{background:var(--no);font-size:56px;animation:p 1.4s ease-in-out infinite}
-@keyframes p{0%,100%{box-shadow:0 0 0 0 rgba(217,71,63,.5)}50%{box-shadow:0 0 0 24px rgba(217,71,63,0)}}
-#b:active{transform:scale(.95)}
-#s{margin-top:26px;font-size:18px;min-height:28px}
-#e{margin-top:10px;font-size:13px;color:var(--no);max-width:320px;word-break:break-word}
-</style></head><body>
-<button id="b" aria-label="녹음">🎙</button><div id="s">눌러서 녹음 시작</div><div id="e"></div>
+body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,"Noto Sans KR",sans-serif;line-height:1.45}
+main{max-width:520px;margin:0 auto;padding:24px 16px 80px;text-align:center}
+button{font:inherit;color:inherit;cursor:pointer}
+.row{display:flex;align-items:center;justify-content:center;gap:18px;min-height:130px}
+#mic{width:120px;height:120px;border-radius:50%;border:0;background:var(--ac);color:#fff;font-size:48px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 22px rgba(59,111,212,.4)}
+#mic.on{background:var(--no);font-size:40px;animation:p 1.4s ease-in-out infinite}
+@keyframes p{0%,100%{box-shadow:0 0 0 0 rgba(217,71,63,.5)}50%{box-shadow:0 0 0 20px rgba(217,71,63,0)}}
+#mic:active,#pl:active{transform:scale(.94)}
+#pl{width:72px;height:72px;border-radius:50%;border:2px solid var(--ac);background:var(--card);color:var(--ac);font-size:28px;display:flex;align-items:center;justify-content:center}
+#pl[hidden]{display:none}
+#st{margin-top:6px;font-size:16px;min-height:24px}
+#er{margin-top:8px;font-size:13px;color:var(--no);word-break:break-word}
+#sv{margin-top:14px;width:100%;max-width:340px;padding:15px;border:0;border-radius:14px;background:var(--ac);color:#fff;font-size:17px;font-weight:600}
+#sv[hidden]{display:none}
+h2{font-size:14px;color:var(--mu);text-align:left;margin:32px 0 8px}
+.it{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px 12px;margin-bottom:8px;text-align:left}
+.ip{width:40px;height:40px;border-radius:50%;border:0;background:var(--ac);color:#fff;font-size:15px;flex:none}
+.im{flex:1;min-width:0;font-size:14px}.im .bar{height:5px;background:var(--bd);border-radius:3px;margin-top:7px;overflow:hidden;cursor:pointer}.im .bar i{display:block;height:100%;width:0;background:var(--ac)}
+.id{border:0;background:none;font-size:20px;padding:8px;color:var(--mu)}
+.mu{color:var(--mu);font-size:13px}
+#tz{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#333;color:#fff;border-radius:22px;padding:10px 18px;font-size:14px;display:none;z-index:9;white-space:nowrap}
+#tz button{border:0;background:none;color:#8fb4ff;font-size:14px;margin-left:12px;font-weight:600}
+</style></head><body><main>
+<div class="row"><button id="mic" aria-label="녹음">🎙</button><button id="pl" hidden aria-label="다시 듣기">▶</button></div>
+<div id="st">눌러서 녹음 시작</div><div id="er"></div>
+<button id="sv" hidden>💾 기록하기</button>
+<h2 id="lh" hidden>기록한 녹음</h2><div id="ls"></div>
+</main><div id="tz"></div>
 <script>
 (function(){
-var $=function(i){return document.getElementById(i)},AC=null,R=null,PL=null,iv=0;
+var $=function(i){return document.getElementById(i)},AC=null,R=null,CUR=null,PL=null,iv=0,UND=null,M=[],PR=22050,BC={},MEM={},IDBP=null;
+try{M=JSON.parse(localStorage.getItem("shadow_takes")||"[]")||[]}catch(e){}
+function sv(){try{localStorage.setItem("shadow_takes",JSON.stringify(M))}catch(e){}}
 function ac(){if(!AC){var C=window.AudioContext||window.webkitAudioContext;AC=new C()}return AC}
-function stopPlay(){if(PL){try{PL.onended=null;PL.stop()}catch(e){}PL=null}}
-function ui(on,msg){$("b").className=on?"on":"";$("b").textContent=on?"■":"🎙";$("s").textContent=msg}
-function start(){stopPlay();$("e").textContent="";var c=ac();c.resume();ui(false,"마이크 준비 중…");
-  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){$("e").textContent="이 브라우저에서는 마이크를 쓸 수 없어요 (https 주소로 열어야 해요)";ui(false,"눌러서 녹음 시작");return}
+function ft(t){t=Math.round(t);return Math.floor(t/60)+":"+("0"+t%60).slice(-2)}
+function fd(t){var d=new Date(t);return(d.getMonth()+1)+"월 "+d.getDate()+"일 "+("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2)}
+var tzT=0;function tz(m,undo){var t=$("tz");t.textContent=m;if(undo){var b=document.createElement("button");b.textContent="실행 취소";b.onclick=undo;t.appendChild(b)}t.style.display="block";clearTimeout(tzT);tzT=setTimeout(function(){t.style.display="none"},undo?5000:2000)}
+/* 저장소 (소리는 IndexedDB) */
+function idb(){return IDBP||(IDBP=new Promise(function(r){try{var q=indexedDB.open("shadow_rec",1);q.onupgradeneeded=function(){q.result.createObjectStore("a")};q.onsuccess=function(){r(q.result)};q.onerror=function(){r(null)}}catch(e){r(null)}}))}
+function ipx(id,v){return idb().then(function(d){return new Promise(function(r){if(!d){MEM[id]=v;r(false);return}try{var q=d.transaction("a","readwrite");q.objectStore("a").put(v,id);q.oncomplete=function(){r(true)};q.onerror=q.onabort=function(){MEM[id]=v;r(false)}}catch(e){MEM[id]=v;r(false)}})})}
+function igx(id){return idb().then(function(d){return new Promise(function(r){if(!d){r(MEM[id]||null);return}try{var q=d.transaction("a").objectStore("a").get(id);q.onsuccess=function(){r(q.result||MEM[id]||null)};q.onerror=function(){r(MEM[id]||null)}}catch(e){r(MEM[id]||null)}})})}
+function idx(id){delete MEM[id];delete BC[id];return idb().then(function(d){if(d)try{d.transaction("a","readwrite").objectStore("a").delete(id)}catch(e){}})}
+/* 소리 변환 */
+function rs(f,r0,r1){if(r0==r1)return f;var n=Math.floor(f.length*r1/r0),o=new Float32Array(n),k=r0/r1;for(var i=0;i<n;i++){var s=Math.floor(i*k),e=Math.min(f.length,Math.floor((i+1)*k)),sum=0;if(e<=s)e=s+1;for(var j=s;j<e;j++)sum+=f[j]||0;o[i]=sum/(e-s)}return o}
+function toPcm(f,r){var x=rs(f,r,PR),o=new Int16Array(x.length);for(var i=0;i<x.length;i++){var v=Math.max(-1,Math.min(1,x[i]));o[i]=v<0?v*32768:v*32767}return{r:PR,d:o}}
+function toBuf(p){var c=ac(),b=c.createBuffer(1,p.d.length,p.r),ch=b.getChannelData(0);for(var i=0;i<p.d.length;i++)ch[i]=p.d[i]/32768;return b}
+async function getBuf(k){if(k=="cur")return CUR&&CUR.buf;if(BC[k])return BC[k];var v=await igx(k);if(!v||!v.d)return null;return BC[k]=toBuf({r:v.r,d:new Int16Array(v.d)})}
+/* 재생 (재생/일시정지) */
+function pos(){return PL?(PL.on?PL.off+(AC.currentTime-PL.t0):PL.off):0}
+function paint(){var c=PL&&PL.on?"⏸":"▶";if($("pl"))$("pl").textContent=PL&&PL.on&&PL.k=="cur"?"⏸":"▶";
+  [].forEach.call(document.querySelectorAll(".ip"),function(b){b.textContent=PL&&PL.on&&PL.k==b.dataset.k?"⏸":"▶"});
+  [].forEach.call(document.querySelectorAll(".bar"),function(b){var p=PL&&PL.k==b.dataset.k&&PL.dur?pos()/PL.dur:0;b.firstChild.style.width=Math.max(0,Math.min(1,p))*100+"%"})}
+function raf(){if(PL&&PL.on){paint();requestAnimationFrame(raf)}}
+function go(){var c=ac();c.resume();var s=c.createBufferSource(),o=PL;s.buffer=o.buf;s.connect(c.destination);
+  s.onended=function(){if(PL===o&&o.src===s&&o.on){var done=pos()>=o.dur-.08;o.on=false;o.src=null;o.off=done?0:pos();paint()}};
+  o.src=s;o.t0=c.currentTime;o.on=true;s.start(0,Math.min(o.off,Math.max(0,o.dur-.01)));raf()}
+function pause(){if(!PL||!PL.on)return;var s=PL.src;PL.off=pos();PL.on=false;PL.src=null;try{s.onended=null;s.stop()}catch(e){}paint()}
+function halt(){if(!PL)return;pause();PL=null;paint()}
+async function play(k){if(PL&&PL.k==k){if(PL.on)pause();else{if(PL.off>=PL.dur-.08)PL.off=0;go()}return}
+  halt();var b=await getBuf(k);if(!b){tz("녹음을 찾을 수 없어요");return}PL={k:k,buf:b,dur:b.duration,off:0,on:false};go()}
+async function seek(k,e,bar){var r=bar.getBoundingClientRect(),f=Math.max(0,Math.min(1,(e.clientX-r.left)/(r.width||1)));if(!PL||PL.k!=k){await play(k);if(!PL||PL.k!=k)return}
+  if(PL.on){var s=PL.src;PL.src=null;PL.on=false;try{s.onended=null;s.stop()}catch(x){}}PL.off=f*PL.dur;go()}
+/* 녹음 */
+function show(on,msg){$("mic").className=on?"on":"";$("mic").textContent=on?"■":"🎙";$("st").textContent=msg}
+function start(){halt();CUR=null;$("pl").hidden=true;$("sv").hidden=true;$("er").textContent="";var c=ac();c.resume();show(false,"마이크 준비 중…");
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){$("er").textContent="이 브라우저에서는 마이크를 쓸 수 없어요 (https 주소로 열어야 해요)";show(false,"눌러서 녹음 시작");return}
   var r=R={ch:[],t0:0};
   navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}}).then(function(st){
     if(R!==r){st.getTracks().forEach(function(t){t.stop()});return}
     r.st=st;r.src=c.createMediaStreamSource(st);r.pr=c.createScriptProcessor(4096,1,1);r.mu=c.createGain();r.mu.gain.value=0;
     r.pr.onaudioprocess=function(e){r.ch.push(new Float32Array(e.inputBuffer.getChannelData(0)))};
     r.src.connect(r.pr);r.pr.connect(r.mu);r.mu.connect(c.destination);r.t0=Date.now();
-    iv=setInterval(function(){var s=Math.floor((Date.now()-r.t0)/1000);ui(true,"녹음 중 "+Math.floor(s/60)+":"+("0"+s%60).slice(-2))},250);ui(true,"녹음 중 0:00")})
-  .catch(function(e){R=null;ui(false,"눌러서 녹음 시작");$("e").textContent="마이크가 막혀 있어요. 주소창 왼쪽 자물쇠 → 권한 → 마이크 허용 후 새로고침해 주세요 ["+(e&&e.name||"")+"]"})}
-function stop(){var r=R;R=null;clearInterval(iv);if(!r||!r.st){ui(false,"눌러서 녹음 시작");return}
+    iv=setInterval(function(){show(true,"녹음 중 "+ft((Date.now()-r.t0)/1000))},250);show(true,"녹음 중 0:00")})
+  .catch(function(e){R=null;show(false,"눌러서 녹음 시작");$("er").textContent="마이크가 막혀 있어요. 주소창 왼쪽 자물쇠 → 권한 → 마이크 허용 후 새로고침해 주세요 ["+(e&&e.name||"")+"]"})}
+function stop(){var r=R;R=null;clearInterval(iv);if(!r||!r.st){show(false,"눌러서 녹음 시작");return}
   try{r.src.disconnect();r.pr.disconnect();r.mu.disconnect()}catch(e){}r.pr.onaudioprocess=null;r.st.getTracks().forEach(function(t){t.stop()});
-  var n=0;r.ch.forEach(function(a){n+=a.length});var c=ac();if(n<c.sampleRate*.3){ui(false,"너무 짧아요. 다시 눌러 녹음하세요");return}
-  var b=c.createBuffer(1,n,c.sampleRate),d=b.getChannelData(0),o=0;r.ch.forEach(function(a){d.set(a,o);o+=a.length});
-  c.resume();var s=c.createBufferSource();s.buffer=b;s.connect(c.destination);PL=s;s.onended=function(){if(PL===s){PL=null;ui(false,"다시 누르면 새로 녹음해요")}};s.start();ui(false,"▶ 재생 중… (누르면 새로 녹음)")}
-$("b").addEventListener("click",function(){if(R&&R.st)stop();else if(!R)start()});
+  var n=0;r.ch.forEach(function(a){n+=a.length});var c=ac();if(n<c.sampleRate*.3){show(false,"너무 짧아요. 다시 눌러 녹음하세요");return}
+  var f=new Float32Array(n),o=0;r.ch.forEach(function(a){f.set(a,o);o+=a.length});
+  var p=toPcm(f,c.sampleRate);CUR={pcm:p,buf:toBuf(p),dur:p.d.length/p.r};
+  show(false,"방금 녹음 · "+ft(CUR.dur)+" — ▶로 다시 듣고, 마음에 들면 기록하세요");$("pl").hidden=false;$("sv").hidden=false;play("cur")}
+async function save(){if(!CUR)return;var id=Date.now().toString(36)+Math.random().toString(36).slice(2,5),c=CUR,ok=await ipx(id,{r:c.pcm.r,d:c.pcm.d.buffer.slice(0)});
+  BC[id]=c.buf;M.unshift({id:id,t:Date.now(),dur:c.dur});sv();halt();CUR=null;$("pl").hidden=true;$("sv").hidden=true;show(false,"기록했어요 ✓ · 다시 녹음하려면 마이크를 누르세요");list();
+  if(!ok)tz("이 브라우저가 파일 저장을 막아서 탭을 닫으면 녹음이 사라져요")}
+function fin(){if(UND){clearTimeout(UND.t);idx(UND.it.id);UND=null}}
+function del(id){fin();var i=M.findIndex(function(x){return x.id==id});if(i<0)return;var it=M.splice(i,1)[0];if(PL&&PL.k==id)halt();sv();list();
+  UND={it:it,i:i,t:setTimeout(fin,5000)};tz("삭제했어요",function(){if(!UND)return;clearTimeout(UND.t);M.splice(Math.min(UND.i,M.length),0,UND.it);UND=null;sv();list();$("tz").style.display="none"})}
+function list(){$("lh").hidden=!M.length;$("ls").innerHTML=M.map(function(x){return '<div class="it"><button class="ip" data-k="'+x.id+'" aria-label="재생">▶</button><div class="im"><b>'+fd(x.t)+'</b> · '+ft(x.dur)+'<div class="bar" data-k="'+x.id+'"><i></i></div></div><button class="id" data-d="'+x.id+'" aria-label="삭제">🗑</button></div>'}).join("");paint()}
+$("mic").onclick=function(){if(R&&R.st)stop();else if(!R)start()};
+$("pl").onclick=function(){if(CUR)play("cur")};
+$("sv").onclick=save;
+document.addEventListener("click",function(e){var t=e.target.closest(".ip,.id,.bar");if(!t)return;if(t.classList.contains("ip"))play(t.dataset.k);else if(t.classList.contains("id"))del(t.dataset.d);else seek(t.dataset.k,e,t)});
+list();
 })();
 </script></body></html>
